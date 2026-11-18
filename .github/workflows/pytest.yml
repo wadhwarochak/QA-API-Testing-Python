@@ -1,3 +1,4 @@
+
 name: Python API Automation Tests
 
 on:
@@ -10,6 +11,9 @@ on:
       - main
 
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   api-tests:
@@ -31,5 +35,51 @@ jobs:
           pip install -r requirements.txt
 
       - name: Execute API Tests
+        id: pytest
         run: |
           python -m pytest -v
+
+      - name: Send Email Notification
+        if: always()
+        uses: dawidd6/action-send-mail@v24
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_USERNAME }}
+
+          subject: "Pytest API Automation - ${{ steps.pytest.outcome }}"
+
+          body: |
+            Hello,
+
+            Your Python API Automation execution has completed.
+
+            Execution Details:
+            ----------------------------
+
+            Project: ${{ github.repository }}
+
+            Branch: ${{ github.ref_name }}
+
+            Execution Status: ${{ steps.pytest.outcome }}
+
+            Trigger: ${{ github.event_name }}
+
+            Commit ID: ${{ github.sha }}
+
+            Workflow: ${{ github.workflow }}
+
+            Execution Details:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ----------------------------
+
+            Regards,
+            GitHub Actions
+            Pytest Automation Framework
