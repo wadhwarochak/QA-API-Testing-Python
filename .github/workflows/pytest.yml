@@ -36,12 +36,26 @@ jobs:
 
       - name: Execute API Tests
         id: pytest
+        continue-on-error: true
         run: |
-          python -m pytest -v
+          mkdir -p reports
+          python -m pytest -v --junitxml=reports/junit.xml
+
+      - name: Generate HTML Email Report
+        if: always()
+        env:
+          PYTEST_OUTCOME: ${{ steps.pytest.outcome }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: |
+          python generate_email_report.py
 
       - name: Send Email Notification
         if: always()
-        uses: dawidd6/action-send-mail@v24
+        uses: dawidd6/action-send-mail@v23
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -53,33 +67,10 @@ jobs:
           to: ${{ secrets.MAIL_TO }}
           from: ${{ secrets.MAIL_USERNAME }}
 
-          subject: "Pytest API Automation - ${{ steps.pytest.outcome }}"
+          subject: "API Automation Report - ${{ steps.pytest.outcome }}"
 
-          body: |
-            Hello,
+          html_body: file://reports/email_report.html
 
-            Your Python API Automation execution has completed.
-
-            Execution Details:
-            ----------------------------
-
-            Project: ${{ github.repository }}
-
-            Branch: ${{ github.ref_name }}
-
-            Execution Status: ${{ steps.pytest.outcome }}
-
-            Trigger: ${{ github.event_name }}
-
-            Commit ID: ${{ github.sha }}
-
-            Workflow: ${{ github.workflow }}
-
-            Execution Details:
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            ----------------------------
-
-            Regards,
-            GitHub Actions
-            Pytest Automation Framework
+      - name: Mark Workflow Failed if Tests Failed
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1
